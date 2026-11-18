@@ -1,0 +1,340 @@
+# NeedsHUD Patch Guide for Mod Authors
+
+resharr · November 2026
+
+## What this guide is for
+
+Any needs mod can show its hunger, thirst, tiredness, cold, dirt, drunkenness and diseases on NeedsHUD's tiles with one small text file and no code. You describe where your mod keeps its values (globals or spells) and how its stages are cut; NeedsHUD reads them and draws its own tiles.
+
+- **No dependency.** The file ships inside your own mod (see Where the file goes). Without NeedsHUD it is never read, so your mod doesn't need NeedsHUD as a master or requirement.
+- **Usually no scripts to change.** NeedsHUD only reads the globals and spells your mod already has; it never writes to your forms. Only a value kept inside a script needs a global (see Where a value can come from).
+- **Your stage names.** Stage names come from your file, so the HUD uses your mod's own terms.
+
+Who it is for: authors of needs, survival, bathing, drinking and disease mods, and patch makers who want to add support for a mod they didn't write.
+
+## Tiles and supported mods
+
+NeedsHUD has the thermometer, its wetness bar, twelve tiles in the needs row, and up to eight tiles of your own. Each shows only while a mod feeds it. The last column says whether your own mod can feed it through a config file.
+
+| Display | Shows | Supported now (built in) | Config file |
+| --- | --- | --- | --- |
+| Thermometer | Cold or exposure, stage names, place arrow, fire and ice looks, freezing water | Survival Mode, Survival Mode Improved, Starfrost, SunHelm, Frostfall | Yes |
+| Wetness bar (on the thermometer) | How wet you are, three stages | Frostfall | Yes |
+| Hunger | Need stages, well-fed look | Survival Mode, Survival Mode Improved, Starfrost, SunHelm, Last Seed, iNeed, Realistic Needs and Diseases | Yes |
+| Thirst | Need stages | SunHelm, Last Seed, iNeed, Realistic Needs and Diseases | Yes |
+| Tiredness | Need stages, rested look | Survival Mode, Survival Mode Improved, Starfrost, SunHelm, Last Seed, iNeed, Realistic Needs and Diseases | Yes |
+| Disease | Worst disease, its stage, how many others | Survival Mode, Survival Mode Improved, Starfrost, SunHelm (and its diseases module), Last Seed, iNeed, Realistic Needs and Diseases, Oregon - Diseases of Skyrim; any other disease by its game name | Yes |
+| Frostbite | How many body parts are frostbitten | Frostfall | No |
+| Vitality | Overall health and where it is heading | Last Seed | No |
+| Dirt | Grime and bloodstains | Keep It Clean, Dirt and Blood, Bathing in Skyrim - Renewed | Yes |
+| Drunk | Drink stages up to passing out | Realistic Needs and Diseases, Last Seed, SunHelm, iNeed | Yes |
+| Body | Body weight from what you eat | Realistic Needs and Diseases | No |
+| Bladder | A dam holding back water; the leak grows | None yet | Yes (only) |
+| Fun | Comedy and tragedy masks | None yet | Yes (only) |
+| Social | Two people; the second fades | None yet | Yes (only) |
+| Your own needs (up to 8) | Your art in our frame | None | Yes (only) |
+
+Also built in: Survival Mode's afflictions (Weakened, Addled, Frostbitten) as badges on the hunger, tiredness and thermometer displays, and Free Cooking's Refreshing on the tiredness tile.
+
+### Bladder, fun and social
+
+Three tiles exist only for config files: no built-in mod feeds them, so they show only when your file does. If your mod tracks one of these, a file is enough.
+
+| Tile | Look | Suggested stage names | Direction |
+| --- | --- | --- | --- |
+| Bladder | A dam holding back water; a crack and a jet grow | Relieved, Need to Go, Desperate, Bursting | Rises as the need grows |
+| Fun | Comedy and tragedy masks; only tragedy at the worst stage | Your mod's names (worst: Bored, Miserable) | Your mod's |
+| Social | Two people; the second fades at the worst stage | Your mod's names (worst: Lonesome, Isolated) | Your mod's |
+
+They use the same keys as the need tiles (`[Bladder]`, `[Fun]`, `[Social]`) and take their place in the needs row; players can switch each off in the menu. `Names` is required for all three.
+
+### Your own needs and your own art
+
+Any need can get a tile, even one NeedsHUD doesn't support yet (sanity, oxygen, magicka hunger), and any tile can use your art. NeedsHUD always draws the frame, the stage bar, the red frame at the worst stage and the text; your art is only the icon inside the frame. That keeps every tile in the row the same size, placed and scaled by the player's settings.
+
+```ini
+[Need:Sanity]
+Name      = Sanity
+Value     = 0x000810
+Direction = falling
+Stages    = 0, 25, 50, 75, 100
+Names     = Lucid, Uneasy, Shaken, Broken
+Icons     = Interface/MyMod/sanity_0.swf, Interface/MyMod/sanity_1.swf, Interface/MyMod/sanity_2.swf, Interface/MyMod/sanity_3.swf
+```
+
+- **New needs:** name the section `[Need:<id>]`, with any id. It takes every key of the need tiles plus `Name` (the label in NeedsHUD's menu, where players can switch it off like any tile) and `Icons`.
+- **Icons:** one image per stage, best first, or a single image for every stage. `.swf` or .png, in your own `Interface` folder (paths start at Data, as in Interface/MyMod/sanity.swf). Draw a .swf on a 128 x 128 px canvas and keep the art inside the central 104 x 104; it shows at half size. A .png can be any size: it is scaled to fit the same 64 x 64 area, so a square image looks best. A .jpg or .dds does not work (the game's picture loader can't read them for the HUD); save it as .png instead (MS Paint does this with Save As > PNG). Paint can't make a transparent background, so its picture fills the whole square; for a cut-out icon (transparent around the shape) use an editor that saves transparency, such as Paint.NET, GIMP or Photopea (free, in the browser). For a single image, Icon = ... works too.
+- **Art for a built-in tile:** add `Icons` to `[Hunger]`, `[Thirst]` and the other tile sections. It only applies while your file feeds that tile. Without it, NeedsHUD's own drawing stays, with its stage-by-stage changes (the tankard tipping, the bowl emptying).
+- **Missing art:** if an image hasn't loaded after 3 seconds, the tile shows a plain placeholder icon and the log names the file. A custom need without Icons shows the placeholder too.
+
+## Quick start
+
+Save a text file in `Data/SKSE/Plugins/NeedsHUD/`, named after your mod (e.g. `MyNeeds.ini`), and ship it in your mod's archive. This one gives a hunger tile with six stages:
+
+```ini
+[Mod]
+Plugin  = MyNeeds.esp
+Name    = My Needs
+Running = 0x000801
+
+[Hunger]
+Value     = 0x000802
+Direction = rising
+Stages    = 0, 40, 80, 140, 240, 360, 468
+Names     = Well Fed, Satisfied, Peckish, Hungry, Ravenous, Starving
+```
+
+1. `Plugin` is your plugin's file name, exactly as in the Data folder.
+2. Form IDs are local, without the load order byte: `0x000802`, not `0x2C000802`. For an ESL plugin they are the last three digits (`0x802`). To find them, open the plugin in xEdit (SSEEdit, free on Nexus): in the list on the left, open your plugin, then its "Global" group. Each global is listed with its FormID (such as `2C000802`) and its Editor ID (such as `MyHungerPoints`). Leave out the first two digits, which are the load order byte, and write `0x` in front of the rest.
+3. `Stages` has one number more than `Names`: each stage runs from its number up to the next one, and the last number is the maximum.
+4. Start the game, open your mod, and look at the hunger tile. If it doesn't show, read the log (see Testing).
+
+## Where the file goes
+
+A mod is a folder of files that the mod manager copies into Skyrim's `Data` folder. Your NeedsHUD file is one more file in that folder, three folders deep:
+
+```text
+MyNeeds.esp
+SKSE
+  Plugins
+    NeedsHUD
+      MyNeeds.ini
+```
+
+1. Inside your mod's folder (the one you zip for Nexus), make a folder named `SKSE`, inside it a folder named `Plugins`, and inside that a folder named `NeedsHUD`. Use these exact names.
+2. Write the file in any text editor, such as Notepad. Save it in the `NeedsHUD` folder with a name ending in `.ini`. In Notepad, set "Save as type" to "All files", or Windows saves it as `MyNeeds.ini.txt` and NeedsHUD won't read it.
+3. Zip your mod as usual. Players install it with Mod Organizer 2 or Vortex, and the file ends up in `Data/SKSE/Plugins/NeedsHUD/`. Players who install by hand copy the same folders into `Skyrim Special Edition/Data/`.
+
+Players who don't use NeedsHUD get the file too. Nothing reads it, so it does nothing for them.
+
+### A file for someone else's mod
+
+If you add support for a mod you didn't write, make a small mod of your own that holds only the `SKSE/Plugins/NeedsHUD/` folders and your `.ini`. Don't put the file inside the other author's mod: their next update would remove it. In `Plugin`, write the other mod's plugin name.
+
+### File names
+
+- Name the file after the mod it covers, such as `RealisticNeedsandDiseases.ini`. Two files with the same name can't sit in one folder: the one installed last replaces the other.
+- NeedsHUD reads only files ending in `.ini` in this folder. Notes or readmes next to it are ignored.
+
+### Two files for the same tile
+
+NeedsHUD reads the files in alphabetical order. If two files feed the same tile and both mods are running, the file that comes first shows the tile and the other file is ignored for that tile. To make your file come first, start its name with an earlier letter. A file always takes the tile over NeedsHUD's built-in support.
+
+## File format
+
+One `[Mod]` section, then one section per tile your mod feeds. Leave out the tiles it doesn't have. Lines starting with `;` are comments.
+
+### Where a value can come from
+
+Every key that takes a value accepts one of these sources:
+
+| Source | Write it as | Use when |
+| --- | --- | --- |
+| Global | `0x000802` | Your mod keeps the value in a GLOB (the usual case) |
+| Global in another plugin | `Other.esp|0x000802` | The value lives in a master or companion plugin |
+| Number | `360` | A fixed limit that never changes |
+
+**Values kept only in a script.** NeedsHUD reads globals and spells only. It never reads Papyrus script properties or variables, because reading them from a plugin can crash the game while a save loads. If your mod keeps a need only inside a script, add a global to your plugin and set it from your own script whenever the value changes (one line: `MyHungerGlobal.SetValue(hunger)`), then give that global here. Files written for NeedsHUD 1.0.2 or older that use `property:` or `variable:` values are skipped with a line in NeedsHUD.log.
+
+A list such as `Stages` can mix sources, so limits the player can change in your MCM stay right: `Stages = 0, 0x002DEA, 0x002DEB, 360`.
+
+### [Mod]
+
+| Key | Required | Meaning |
+| --- | --- | --- |
+| `Plugin` | yes | Your plugin's file name. Nothing in the file is read unless it is loaded. |
+| `Name` | yes | Shown in NeedsHUD's log and menu. |
+| `Running` | no | A value that shows your mod is active. Tiles show only while it is at least `RunningMin`. |
+| `RunningMin` | no | Default 1. |
+| `AltPlugin` | no | Other file names that carry the same form IDs (a merged or renamed release). The first one loaded is used. |
+
+### Need tiles: [Hunger], [Thirst], [Tiredness]
+
+| Key | Required | Meaning |
+| --- | --- | --- |
+| `Value` | yes | The need's current value. |
+| `Direction` | yes | `rising` if a higher value is worse, `falling` if higher is better. |
+| `Stages` | yes | Stage limits, lowest first, the last being the maximum. |
+| `Names` | yes | One name per stage, best stage first. |
+| `Enabled` | no | A switch value; the tile hides while it is below `EnabledMin` (default 1). For a need the player can turn off. |
+| `Bonus` | no | `first` gives the first stage the well-fed or well-rested look. |
+| `Word` | no | The word on the numbers line (default Hunger, Thirst, Fatigue). |
+
+### [Cold]: the thermometer
+
+| Key | Required | Meaning |
+| --- | --- | --- |
+| `Value` | yes | Cold, exposure or body temperature. |
+| `Direction` | yes | `rising` for cold scores, `falling` for a body temperature. |
+| `Stages` | yes | Three to six stages, warm to deadly, plus the maximum. Each stage is one block of the scale. |
+| `Names` | yes | One per stage. |
+| `Target` | no | Where the value is heading in this place and weather: drawn as the place arrow. |
+| `NearHeat` | no | Above 0 while the player is near a fire: the warming look. |
+| `InColdWater` | no | Above 0 while the player swims in freezing water. |
+| `Wetness` | no | How wet the player is, with `WetnessMax` and `WetnessNames` (exactly three; the value is cut evenly into three stages, and 0 means dry). |
+
+### [ColdProtection]: a buff against the cold
+
+Use this section if your mod has a food, potion or spell that makes the cold hurt less. While the buff runs, the thermometer shows the player which stages are now safe: the top cold blocks turn unpainted, like Comfortable, and each colder block takes the colour of the stage it now counts as. The mercury and the place arrow stay where they are.
+
+```ini
+[ColdProtection]
+StageShift        = 0x000AA8   ; how many stages warmer every place counts right now
+FreezingWaterSafe = 0x000AA9   ; 1 while the buff makes freezing water harmless
+```
+
+| Key | Required | Meaning |
+| --- | --- | --- |
+| `StageShift` | at least one of the two | How many cold stages warmer every place counts right now. 0 means no buff. |
+| `FreezingWaterSafe` | at least one of the two | At least 1 while the buff makes freezing water harmless. The thermometer then drops its freezing-water look. |
+
+An example with Survival Mode's thermometer (Warm, Comfortable, Chilly, Very Cold, Freezing, Numb) and `StageShift = 1`: Chilly is drawn unpainted like Comfortable, Very Cold takes Chilly's colour, Freezing takes Very Cold's and Numb takes Freezing's.
+
+- **Your mod does the protecting.** NeedsHUD only changes the drawing. Your mod has to keep the player's cold that many stages warmer itself; NeedsHUD never changes a cold value.
+- **Any thermometer.** It works with the built-in support for every survival mod and with a `[Cold]` section from any file. Your file doesn't need a `[Cold]` section of its own.
+- **Always read.** This section is read whatever `Running` in `[Mod]` says, so set both values back to 0 when the buff ends.
+- **Large numbers are fine.** A shift as large as the number of cold stages (or larger) shows every cold block unpainted.
+- **Two mods with a buff.** If two files have this section, the largest `StageShift` is used, and freezing water counts as safe if either file says so.
+- **Version.** This section needs NeedsHUD 1.0.4 or newer. Older versions skip it with a line in the log, and the rest of your file still works.
+
+### [Dirt], [Drunk]
+
+The same keys as the need tiles. `[Drunk]` adds `Cap = no` when nothing comes after your last stage (no pass-out): the bar then has no red end.
+
+### Stage spells instead of a value
+
+Some mods have no number, only one spell or effect per stage. Any tile can use them: the need tiles, `[Dirt]`, `[Drunk]`, your own `[Need:<id>]` tiles and the thermometer. Leave out `Value`, `Stages` and `Direction` and give:
+
+| Key | Meaning |
+| --- | --- |
+| `StageSpells` | One spell per stage, best first. The stage is the worst one the player has. |
+| `Names` | One per stage, as above. |
+
+For the thermometer (`[Cold]`) give three to six stage spells. Its place arrow (`Target`) is drawn on a scale of numbers, so with stage spells it also needs `Stages` (one number more than `Names`); without them the arrow is left out and the log says why.
+
+### [Disease]
+
+One line per disease family, so a disease and its stage spells count as one:
+
+```ini
+[Disease]
+Words           = Mild, Severe, Crippling
+Ataxia          = 0x010678, 0x00A530, 0x00A534
+Ataxia.Carriers = Skyrim.esm|0x0B877C, Skyrim.esm|0x10A24A
+```
+
+- The key is the name shown. The values are its stage spells, first stage first.
+- `Ataxia.Carriers` (optional) lists spells that stay on the player beside the stages, such as the caught disease itself. They join the family, so it isn't counted twice.
+- `Words` names the stages on the tile's second line ("Severe, stage 2 of 3").
+
+## Mapping your mod to the tiles
+
+Every tile draws a bar from best (top) to worst (bottom), split into your stages, with a red end cap for the deadly end. You only describe your numbers; NeedsHUD handles the drawing, hiding the drunk and disease tiles when there is nothing to show, and the red frame at the worst stage.
+
+| Tile | Shows | Mapping tips |
+| --- | --- | --- |
+| Hunger, Thirst, Tiredness | One need each, with your stage names | Use `Direction = falling` if "100 = full". If the last stage has no upper limit, repeat its start as the maximum plus a margin, e.g. `..., 240, 300`. |
+| Cold (thermometer) | Mercury level, stage names, place arrow, fire or ice look | Three to six stages; each becomes one block of the scale, the first drawn as the warm one. A body temperature works with `falling` (37 normal, lower = colder). `Target` is optional but is the tile's most useful hint. |
+| Wetness | A bar beside the thermometer and a line under it | Give the value and its maximum; names are cut evenly over the range. |
+| Dirt | Smudges and stench lines spreading on a tunic | Hours since bathing work as a value (`rising`). Spell-based stages work too. |
+| Drunk | A tankard tipping over | Set `Cap = no` if your mod has no pass-out stage. |
+| Disease | Worst disease, its stage, and how many others | Only list spells of type Disease or abilities your mod adds per stage. Vanilla diseases are already known. |
+
+Three rules for correct tiles:
+
+- **Best first.** `Names` always starts with the best stage, whatever the direction.
+- **Use the real value.** Point at the value your scripts actually use, not a display copy that updates less often.
+- **One file per mod.** If your mod has optional plugins (a diseases module, say), give each its own file with its own `Plugin`, so a missing optional plugin only drops its own tiles.
+
+## Worked example: Realistic Needs and Diseases
+
+RND support written as a file, using the form IDs read from RND 2.3.6. Its stage limits are MCM globals, so they are named by ID and follow the player's settings. Nirnfeel Immersion Overhaul carries the same IDs under another file name, so one `AltPlugin` line covers it.
+
+```ini
+[Mod]
+Plugin    = RealisticNeedsandDiseases.esp
+AltPlugin = MVC Nirnfeel Immersion.esp
+Name      = Realistic Needs and Diseases
+Running   = 0x012C4C          ; RND_State, 1 once started in its MCM
+
+[Hunger]
+Value     = 0x002884          ; RND_HungerPoints, rises
+Direction = rising
+; RND_HungerLevel00..05; points stop at Level05, so it is also the maximum
+Stages    = 0x002DE9, 0x002DEA, 0x002DEB, 0x002DEC, 0x002DED, 0x002DEE, 0x002DEE
+Names     = Overindulged, Satiated, Peckish, Hungry, Very Hungry, Starving
+Bonus     = first
+
+[Drunk]
+Value     = 0x0069A0          ; RND_InebriationPoints
+Direction = rising
+; Level00..03, then 135: RND blacks you out at Level04 (150) minus 15
+Stages    = 0x00699E, 0x00699A, 0x00699B, 0x00699C, 135
+Names     = Sober, Dizzy, Drunk, Wasted
+
+[Disease]
+Words           = Mild, Severe, Crippling
+Ataxia          = 0x010678, 0x00A530, 0x00A534
+Ataxia.Carriers = Skyrim.esm|0x0B877C, Skyrim.esm|0x10A24A
+; ...the other five families the same way
+```
+
+Thirst and tiredness follow the hunger pattern. The drunk tile hides by itself while the value is 0.
+
+## Testing
+
+NeedsHUD logs every file it reads to `Documents/My Games/Skyrim Special Edition/SKSE/NeedsHUD.log`, with one line per key: found, missing, or rejected and why. Check it after your first launch.
+
+1. Load a save with your mod running and check that each tile appears.
+2. Push each value through its stages from the console, e.g. `set MyHungerPoints to 250`, and watch the stage name and bar follow. Unpause for a moment; the HUD updates a few times a second.
+3. Turn your mod off (or a need off in your MCM) and check that its tiles hide.
+4. Turn on NeedsHUD's numbers line in its menu to see the raw value it reads next to the stage name.
+
+| Symptom | Likely cause |
+| --- | --- |
+| Log says "plugin not loaded" | `Plugin` doesn't match the file name in the Data folder. |
+| A key is "missing" | The form ID includes the load order byte, or points at the wrong record type. |
+| Tile never shows | `Running` or `Enabled` stays below its minimum, or the player set the needs row to show only when a stage changes (it then hides again after a few seconds). |
+| Stage names are off by one | `Stages` doesn't have exactly one number more than `Names`. |
+| Bar runs the wrong way | `Direction` is reversed. |
+| A disease shows as "+1" | Its caught spell isn't listed in `.Carriers`, so it is counted on its own. |
+
+## Translating NeedsHUD
+
+NeedsHUD shows its own text in English: its stage names for the supported mods, the lines under the tiles, the warning box and the whole settings menu. One text file, in Skyrim's usual translation format, shows all of it in your language. No code is needed.
+
+```text
+Interface
+  Translations
+    NeedsHUD_GERMAN.txt
+```
+
+1. Find `NeedsHUD_ENGLISH.txt` in `Data/Interface/Translations/`. It comes with NeedsHUD and lists every phrase NeedsHUD shows.
+2. Copy it and rename the copy after your game's language, in capitals: `NeedsHUD_GERMAN.txt`, `NeedsHUD_FRENCH.txt`, `NeedsHUD_RUSSIAN.txt` and so on. The word after the underscore must match the game's language setting (`sLanguage` in `Skyrim.ini`).
+3. Each line is `$NHUD_` and the English text, then a Tab, then the text players see. Change only the part after the Tab. NeedsHUD finds each line by the part before it, so leave that part as it is.
+4. Keep every `{}`: a number or a word goes there (`Warmth {}` becomes `Wärme {}`). You can move it inside the sentence, but keep the same number of them. Keep codes like `%.1f%%` the same way.
+5. Save the file as UTF-16 LE. In Notepad: File, Save As, and pick "UTF-16 LE" under Encoding. Skyrim's translation files use this encoding.
+6. Ship it in a small mod of your own that holds only these folders and your file.
+
+To see your file without switching the whole game to that language, open NeedsHUD's settings file, `Documents\My Games\Skyrim Special Edition\SKSE\NeedsHUD.ini` (NeedsHUD makes it the first time the game runs with it), and set `sLanguage=GERMAN` (your language) under `[General]`. Leave it empty to follow the game again. NeedsHUD.log then says how many lines your file translates.
+
+- A line you delete or leave empty shows the English, so a translation can be partial.
+- A line with the wrong number of `{}` shows the English pattern instead of breaking the HUD.
+- Names that come from other mods (their NeedsHUD files, disease names from the game) are not in this file: those mods translate them.
+- Letters the game's font doesn't have (Chinese, for example) need a font mod, the same as for the rest of the game.
+
+## Status and limits
+
+Config files are read from NeedsHUD 1.0 on, once at game start: after editing a file, restart the game.
+
+- **Already supported, no file needed:** every mod in the Tiles and supported mods table.
+- **A file wins over built-in support.** If your mod is already supported and you change its forms in an update, ship a file and NeedsHUD uses yours.
+- **Comments after a value** (`Value = 0x802 ; hunger`) are allowed.
+
+What a file can't describe, and stays built into NeedsHUD:
+
+- Values that must be calculated, such as dirt as hours between two timestamps (Keep It Clean).
+- Stages with two versions at once, such as Dirt and Blood's bloodstains.
+- Last Seed's vitality and its target, Frostfall's frostbite per body part, and RND's body weight.
+
+If a correct file doesn't work as this guide describes, report it as a bug on the NeedsHUD Nexus page, with your file and NeedsHUD.log attached.
